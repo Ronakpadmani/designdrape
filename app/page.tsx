@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import ProductCard from "@/components/product/ProductCard";
 import { getProducts } from "@/services/productService";
@@ -19,7 +20,6 @@ export default function HomePage() {
 
   return (
     <main className="bg-[#050505] min-h-screen text-white overflow-hidden">
-      {/* HERO */}
       <section className="relative h-screen flex items-center px-8 md:px-24 pt-32">
         <img
           src="https://images.unsplash.com/photo-1496747611176-843222e1e57c?q=80&w=1600"
@@ -55,24 +55,22 @@ export default function HomePage() {
           </p>
 
           <div className="flex flex-wrap gap-4">
-            <button className="btn-primary px-10 py-4 text-base">
+            <Link href="/collections" className="btn-primary px-10 py-4 text-base">
               Explore Collection
-            </button>
-            <button className="btn-secondary px-10 py-4 text-base">
+            </Link>
+            <Link href="/collections" className="btn-secondary px-10 py-4 text-base">
               View Designs
-            </button>
+            </Link>
           </div>
         </motion.div>
 
-        {/* Scroll indicator */}
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/30">
           <span className="text-[10px] uppercase tracking-[0.3em]">Scroll</span>
           <div className="w-px h-12 bg-gradient-to-b from-[#C9A84C]/50 to-transparent" />
         </div>
       </section>
 
-      {/* PRODUCTS */}
-      <section className="page-container px-8 py-28">
+      <section id="trending" className="page-container px-8 py-28">
         <motion.div
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -87,11 +85,17 @@ export default function HomePage() {
           <p className="text-white/45 text-lg max-w-xl mx-auto">
             Crafted for elegance, designed for perfection.
           </p>
+          <Link
+            href="/collections"
+            className="inline-block mt-8 text-sm uppercase tracking-[0.2em] text-[#C9A84C] hover:text-[#dbbe60] transition-colors"
+          >
+            View all designs →
+          </Link>
           <div className="divider-gold max-w-xs mx-auto mt-10" />
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-10">
-          {products.map((product) => (
+          {products.slice(0, 6).map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>

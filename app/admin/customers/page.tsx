@@ -1,0 +1,324 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
+import {
+  getCustomers,
+  createCustomerByAdmin,
+  updateCustomer,
+  deleteCustomer,
+} from "@/services/authService";
+import type { Customer } from "@/types";
+
+const emptyForm = {
+  name: "",
+  email: "",
+  phoneNumber: "",
+  address: "",
+  notes: "",
+  password: "",
+};
+
+export default function AdminCustomersPage() {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState(emptyForm);
+
+  const fetchCustomers = async () => {
+    setLoading(true);
+    try {
+      const data = await getCustomers();
+      setCustomers(data);
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCustomers();
+  }, []);
+
+  const resetForm = () => {
+    setForm(emptyForm);
+    setEditingId(null);
+    setShowForm(false);
+  };
+
+  const openCreate = () => {
+    resetForm();
+    setShowForm(true);
+  };
+
+  const openEdit = (customer: Customer) => {
+    setEditingId(customer.uid);
+    setForm({
+      name: customer.name || "",
+      email: customer.email || "",
+      phoneNumber: customer.phoneNumber || "",
+      address: customer.address || "",
+      notes: customer.notes || "",
+      password: "",
+    });
+    setShowForm(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!form.name.trim() || !form.phoneNumber.trim()) {
+      toast.error("Name and phone number are required");
+      return;
+    }
+
+    try {
+      if (editingId) {
+        await updateCustomer(editingId, {
+          name: form.name.trim(),
+          phoneNumber: form.phoneNumber.trim(),
+          address: form.address.trim(),
+          notes: form.notes.trim(),
+        });
+        toast.success("Customer updated");
+      } else {
+        if (!form.email.trim() || !form.password.trim()) {
+          toast.error("Email and password are required for new customers");
+          return;
+        }
+        if (form.password.length < 6) {
+          toast.error("Password must be at least 6 characters");
+          return;
+        }
+        await createCustomerByAdmin({
+          name: form.name.trim(),
+          email: form.email.trim(),
+          phoneNumber: form.phoneNumber.trim(),
+          address: form.address.trim(),
+          notes: form.notes.trim(),
+          password: form.password,
+        });
+        toast.success("Customer created — share login credentials with them");
+      }
+
+      resetForm();
+      fetchCustomers();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleDelete = async (customer: Customer) => {
+    if (
+      !confirm(
+        `Delete ${customer.name}? Their profile will be removed. (Firebase login may still exist.)`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deleteCustomer(customer.uid);
+      toast.success("Customer deleted");
+      fetchCustomers();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  return (
+    <div className="page-shell">
+      <div className="page-container">
+        <div className="flex flex-wrap items-end justify-between gap-4 mb-2">
+          <div>
+            <p className="badge-gold mb-4">Clients</p>
+            <h1 className="page-title">Customers</h1>
+            <p className="page-subtitle mb-0">
+              Add and manage customer accounts
+            </p>
+          </div>
+          {!showForm && (
+            <button type="button" onClick={openCreate} className="btn-primary">
+              + Add Customer
+            </button>
+          )}
+        </div>
+
+        {showForm && (
+          <form
+            onSubmit={handleSubmit}
+            className="card-glass p-8 md:p-10 space-y-5 mt-10 max-w-3xl"
+          >
+            <h2 className="font-[family-name:var(--font-cormorant)] text-2xl text-white">
+              {editingId ? "Edit Customer" : "New Customer"}
+            </h2>
+
+            <div className="grid sm:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={form.name}
+                  onChange={(e) =>
+                    setForm({ ...form, name: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
+                  Phone Number *
+                </label>
+                <input
+                  type="tel"
+                  className="input-field"
+                  placeholder="+91 98765 43210"
+                  value={form.phoneNumber}
+                  onChange={(e) =>
+                    setForm({ ...form, phoneNumber: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
+                  Email {editingId ? "" : "*"}
+                </label>
+                <input
+                  type="email"
+                  className="input-field disabled:opacity-50"
+                  value={form.email}
+                  onChange={(e) =>
+                    setForm({ ...form, email: e.target.value })
+                  }
+                  disabled={!!editingId}
+                  required={!editingId}
+                />
+              </div>
+              {!editingId && (
+                <div>
+                  <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
+                    Password *
+                  </label>
+                  <input
+                    type="password"
+                    className="input-field"
+                    placeholder="Min. 6 characters"
+                    value={form.password}
+                    onChange={(e) =>
+                      setForm({ ...form, password: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+              )}
+              <div className="sm:col-span-2">
+                <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
+                  Address
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={form.address}
+                  onChange={(e) =>
+                    setForm({ ...form, address: e.target.value })
+                  }
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
+                  Notes
+                </label>
+                <textarea
+                  className="input-field resize-none"
+                  rows={3}
+                  placeholder="Preferences, fitting notes…"
+                  value={form.notes}
+                  onChange={(e) =>
+                    setForm({ ...form, notes: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3 pt-2">
+              <button type="submit" className="btn-primary">
+                {editingId ? "Update Customer" : "Create Customer"}
+              </button>
+              <button
+                type="button"
+                onClick={resetForm}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+
+        <div className="mt-10 space-y-4">
+          {loading ? (
+            <div className="loading-screen">
+              <div className="spinner" />
+            </div>
+          ) : customers.length === 0 ? (
+            <div className="card-glass p-12 text-center text-white/40">
+              No customers yet. Add your first customer above.
+            </div>
+          ) : (
+            customers.map((customer) => (
+              <div
+                key={customer.uid}
+                className="card-glass p-6 flex flex-col md:flex-row md:items-center justify-between gap-4"
+              >
+                <div>
+                  <h3 className="font-[family-name:var(--font-cormorant)] text-xl text-white">
+                    {customer.name}
+                  </h3>
+                  <p className="text-white/45 text-sm mt-1">
+                    {customer.phoneNumber || "—"}
+                    {customer.email && (
+                      <span className="mx-2 text-white/20">|</span>
+                    )}
+                    {customer.email}
+                  </p>
+                  {customer.address && (
+                    <p className="text-white/35 text-sm mt-1">
+                      {customer.address}
+                    </p>
+                  )}
+                  {customer.notes && (
+                    <p className="text-white/30 text-xs mt-2 italic">
+                      {customer.notes}
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-3 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => openEdit(customer)}
+                    className="btn-secondary text-sm py-2.5 px-5"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(customer)}
+                    className="btn-danger text-sm"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

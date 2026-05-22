@@ -61,7 +61,7 @@ export default function Navbar() {
 
           <div className="hidden lg:flex items-center gap-7">
             <NavLink href="/">Home</NavLink>
-            <NavLink href="/">Collections</NavLink>
+            <NavLink href="/collections">Collections</NavLink>
 
             {user && userData?.role === "customer" && (
               <NavLink href="/orders">Orders</NavLink>
@@ -69,6 +69,7 @@ export default function Navbar() {
 
             {user && userData?.role === "admin" && (
               <>
+                <NavLink href="/admin/customers">Customers</NavLink>
                 <NavLink href="/admin/products">Products</NavLink>
                 <NavLink href="/admin/orders">Orders</NavLink>
                 <NavLink href="/admin/measurements">Measurements</NavLink>
@@ -143,7 +144,7 @@ export default function Navbar() {
               <NavLink href="/" onClick={() => setMobileOpen(false)}>
                 Home
               </NavLink>
-              <NavLink href="/" onClick={() => setMobileOpen(false)}>
+              <NavLink href="/collections" onClick={() => setMobileOpen(false)}>
                 Collections
               </NavLink>
 
@@ -155,6 +156,12 @@ export default function Navbar() {
 
               {user && userData?.role === "admin" && (
                 <>
+                  <NavLink
+                    href="/admin/customers"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    Customers
+                  </NavLink>
                   <NavLink
                     href="/admin/products"
                     onClick={() => setMobileOpen(false)}

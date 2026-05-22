@@ -2,62 +2,47 @@ import {
   addDoc,
   collection,
   getDocs,
-} from "firebase/firestore";
-
-import {
   doc,
   getDoc,
+  updateDoc,
+  deleteDoc,
 } from "firebase/firestore";
 
 import { db } from "@/firebase/firebaseConfig";
 
-
-// ADD PRODUCT
-export const addProduct = async (
-  productData: any
-) => {
-
-  return await addDoc(
-    collection(db, "products"),
-    productData
-  );
+export type ProductInput = {
+  name: string;
+  description: string;
+  price: string;
+  image: string;
+  category?: string;
+  createdAt?: Date;
 };
 
+export const addProduct = async (productData: ProductInput) => {
+  return await addDoc(collection(db, "products"), productData);
+};
 
-// GET PRODUCTS
 export const getProducts = async () => {
-
-  const querySnapshot =
-    await getDocs(
-      collection(db, "products")
-    );
+  const querySnapshot = await getDocs(collection(db, "products"));
 
   const products: any[] = [];
 
-  querySnapshot.forEach((doc) => {
-
+  querySnapshot.forEach((docSnap) => {
     products.push({
-      id: doc.id,
-      ...doc.data(),
+      id: docSnap.id,
+      ...docSnap.data(),
     });
   });
 
   return products;
 };
 
-// GET SINGLE PRODUCT
-export const getSingleProduct = async (
-  id: string
-) => {
-
-  const docRef =
-    doc(db, "products", id);
-
-  const docSnap =
-    await getDoc(docRef);
+export const getSingleProduct = async (id: string) => {
+  const docRef = doc(db, "products", id);
+  const docSnap = await getDoc(docRef);
 
   if (docSnap.exists()) {
-
     return {
       id: docSnap.id,
       ...docSnap.data(),
@@ -65,4 +50,15 @@ export const getSingleProduct = async (
   }
 
   return null;
+};
+
+export const updateProduct = async (id: string, productData: ProductInput) => {
+  await updateDoc(doc(db, "products", id), {
+    ...productData,
+    updatedAt: new Date(),
+  });
+};
+
+export const deleteProduct = async (id: string) => {
+  await deleteDoc(doc(db, "products", id));
 };

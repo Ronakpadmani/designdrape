@@ -4,58 +4,83 @@ import {
   getDocs,
   query,
   where,
+  doc,
+  updateDoc,
+  deleteDoc,
 } from "firebase/firestore";
 
 import { db } from "@/firebase/firebaseConfig";
 
+import type { Measurement } from "@/types";
 
-// SAVE MEASUREMENTS
-export const saveMeasurement =
-  async (
-    measurementData: any
-  ) => {
+export type MeasurementInput = Omit<
+  Measurement,
+  "id" | "createdAt" | "updatedAt"
+>;
 
-    return await addDoc(
-      collection(
-        db,
-        "measurements"
-      ),
-      measurementData
-    );
-  };
+// CREATE
+export const saveMeasurement = async (measurementData: MeasurementInput) => {
+  return await addDoc(collection(db, "measurements"), {
+    ...measurementData,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+};
 
+// READ — ALL (admin)
+export const getAllMeasurements = async (): Promise<Measurement[]> => {
+  const querySnapshot = await getDocs(collection(db, "measurements"));
 
-// GET USER MEASUREMENTS
-export const getUserMeasurements =
-  async (
-    userId: string
-  ) => {
+  const measurements: Measurement[] = [];
 
-    const q = query(
-      collection(
-        db,
-        "measurements"
-      ),
+  querySnapshot.forEach((docSnap) => {
+    measurements.push({
+      id: docSnap.id,
+      ...docSnap.data(),
+    } as Measurement);
+  });
 
-      where(
-        "userId",
-        "==",
-        userId
-      )
-    );
+  return measurements.sort((a, b) => {
+    const aTime = a.updatedAt || a.createdAt;
+    const bTime = b.updatedAt || b.createdAt;
+    if (!aTime || !bTime) return 0;
+    return new Date(bTime as any).getTime() - new Date(aTime as any).getTime();
+  });
+};
 
-    const querySnapshot =
-      await getDocs(q);
+// READ — BY USER
+export const getUserMeasurements = async (userId: string) => {
+  const q = query(
+    collection(db, "measurements"),
+    where("userId", "==", userId)
+  );
 
-    const measurements: any[] = [];
+  const querySnapshot = await getDocs(q);
 
-    querySnapshot.forEach((doc) => {
+  const measurements: Measurement[] = [];
 
-      measurements.push({
-        id: doc.id,
-        ...doc.data(),
-      });
-    });
+  querySnapshot.forEach((docSnap) => {
+    measurements.push({
+      id: docSnap.id,
+      ...docSnap.data(),
+    } as Measurement);
+  });
 
-    return measurements;
-  };
+  return measurements;
+};
+
+// UPDATE
+export const updateMeasurement = async (
+  id: string,
+  measurementData: MeasurementInput
+) => {
+  await updateDoc(doc(db, "measurements", id), {
+    ...measurementData,
+    updatedAt: new Date(),
+  });
+};
+
+// DELETE
+export const deleteMeasurement = async (id: string) => {
+  await deleteDoc(doc(db, "measurements", id));
+};

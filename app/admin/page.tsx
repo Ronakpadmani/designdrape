@@ -3,9 +3,10 @@
 import Link from "next/link";
 
 const adminLinks = [
+  { href: "/admin/customers", label: "Customers", desc: "Add & manage clients" },
   { href: "/admin/products", label: "Products", desc: "Manage catalogue" },
   { href: "/admin/orders", label: "Orders", desc: "Track & update orders" },
-  { href: "/admin/measurements", label: "Measurements", desc: "Customer fittings" },
+  { href: "/admin/measurements", label: "Measurements", desc: "Full measurement CRUD" },
 ];
 
 export default function AdminPage() {

@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getUserOrders } from "@/services/orderService";
+import RequireAuth from "@/components/RequireAuth";
+import ProductImage from "@/components/ProductImage";
 
 const statusStyles: Record<string, string> = {
   Pending: "bg-amber-500/15 text-amber-300 border-amber-500/30",
@@ -26,6 +28,7 @@ export default function OrdersPage() {
   }, [user]);
 
   return (
+    <RequireAuth>
     <div className="page-shell">
       <div className="page-container">
         <p className="badge-gold mb-4">Order History</p>
@@ -79,7 +82,7 @@ export default function OrdersPage() {
                       key={item.id}
                       className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]"
                     >
-                      <img
+                      <ProductImage
                         src={item.image}
                         alt={item.name}
                         className="w-16 h-16 object-cover rounded-lg border border-white/10"
@@ -104,5 +107,6 @@ export default function OrdersPage() {
         )}
       </div>
     </div>
+    </RequireAuth>
   );
 }

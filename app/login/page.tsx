@@ -1,34 +1,43 @@
 "use client";
 
-import { useState } from "react";
-import { loginUser } from "@/services/authService";
+import { useState, useEffect, Suspense } from "react";
+import { loginUser, getUserRole } from "@/services/authService";
 import toast from "react-hot-toast";
-import { useRouter } from "next/navigation";
-import { getUserRole } from "@/services/authService";
+import { useRouter, useSearchParams } from "next/navigation";
 import AuthLayout from "@/components/AuthLayout";
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const emailParam = searchParams.get("email");
+    if (emailParam) setEmail(emailParam);
+
+    if (searchParams.get("registered") === "1") {
+      toast.success("Registration complete. Please sign in.");
+    }
+  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
       const userCredential = await loginUser(email, password);
-
       toast.success("Login Successful");
 
       const uid = userCredential.user.uid;
-
       const userData = await getUserRole(uid);
+      const redirect = searchParams.get("redirect");
 
       if (userData?.role === "admin") {
         router.push("/admin");
+      } else if (redirect && redirect.startsWith("/")) {
+        router.push(redirect);
       } else {
-        router.push("/dashboard");
+        router.push("/");
       }
     } catch (error: any) {
       toast.error(error.message);
@@ -54,6 +63,7 @@ export default function LoginPage() {
             className="input-field"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            required
           />
         </div>
 
@@ -67,6 +77,7 @@ export default function LoginPage() {
             className="input-field"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            required
           />
         </div>
 
@@ -75,5 +86,19 @@ export default function LoginPage() {
         </button>
       </form>
     </AuthLayout>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="loading-screen min-h-screen">
+          <div className="spinner" />
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

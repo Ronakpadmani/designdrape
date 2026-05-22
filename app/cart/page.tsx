@@ -2,6 +2,8 @@
 
 import { useCart } from "@/context/CartContext";
 import Link from "next/link";
+import RequireAuth from "@/components/RequireAuth";
+import ProductImage from "@/components/ProductImage";
 
 export default function CartPage() {
   const {
@@ -17,6 +19,7 @@ export default function CartPage() {
   );
 
   return (
+    <RequireAuth>
     <div className="page-shell">
       <div className="page-container">
         <p className="badge-gold mb-4">Your Bag</p>
@@ -36,7 +39,7 @@ export default function CartPage() {
             <p className="text-white/40 text-sm mb-8">
               Discover our collection and add something you love.
             </p>
-            <Link href="/" className="btn-primary">
+            <Link href="/collections" className="btn-primary">
               Browse Collection
             </Link>
           </div>
@@ -50,7 +53,7 @@ export default function CartPage() {
                 >
                   <div className="flex items-center gap-5">
                     <div className="relative shrink-0 overflow-hidden rounded-xl w-28 h-28 border border-white/10">
-                      <img
+                      <ProductImage
                         src={item.image}
                         alt={item.name}
                         className="w-full h-full object-cover"
@@ -121,5 +124,6 @@ export default function CartPage() {
         )}
       </div>
     </div>
+    </RequireAuth>
   );
 }

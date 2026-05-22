@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { registerUser } from "@/services/authService";
+import { useRouter } from "next/navigation";
+import { registerUser, logoutUser } from "@/services/authService";
 import toast from "react-hot-toast";
 import AuthLayout from "@/components/AuthLayout";
-
 export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const router = useRouter();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,11 +17,13 @@ export default function RegisterPage() {
     try {
       await registerUser(name, email, password);
 
-      toast.success("Registration Successful");
+      await logoutUser();
 
-      setName("");
-      setEmail("");
-      setPassword("");
+      toast.success("Account created! Please sign in.");
+
+      router.push(
+        `/login?redirect=${encodeURIComponent("/")}&registered=1&email=${encodeURIComponent(email)}`
+      );
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -45,6 +48,7 @@ export default function RegisterPage() {
             className="input-field"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            required
           />
         </div>
 
@@ -58,6 +62,7 @@ export default function RegisterPage() {
             className="input-field"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            required
           />
         </div>
 
@@ -71,6 +76,8 @@ export default function RegisterPage() {
             className="input-field"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={6}
           />
         </div>
 

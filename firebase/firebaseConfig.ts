@@ -23,7 +23,10 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 //const analytics = getAnalytics(app);
 
+// Secondary app — create customer accounts without signing out admin
+const secondaryApp = initializeApp(firebaseConfig, "Secondary");
 
 export const auth = getAuth(app);
+export const secondaryAuth = getAuth(secondaryApp);
 export const db = getFirestore(app);
 export const storage = getStorage(app);

@@ -6,11 +6,12 @@ import toast from "react-hot-toast";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { placeOrder } from "@/services/orderService";
+import RequireAuth from "@/components/RequireAuth";
 
 export default function CheckoutPage() {
   const router = useRouter();
   const { cartItems } = useCart();
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
   const [address, setAddress] = useState("");
 
   const totalPrice = cartItems.reduce(
@@ -32,6 +33,9 @@ export default function CheckoutPage() {
     try {
       await placeOrder({
         userId: user.uid,
+        customerName: userData?.name || user.displayName || "Customer",
+        customerEmail: userData?.email || user.email || "",
+        customerPhone: userData?.phoneNumber || "",
         items: cartItems,
         address,
         totalPrice,
@@ -48,6 +52,7 @@ export default function CheckoutPage() {
   };
 
   return (
+    <RequireAuth>
     <div className="page-shell">
       <div className="page-container max-w-3xl">
         <p className="badge-gold mb-4">Secure Checkout</p>
@@ -83,5 +88,6 @@ export default function CheckoutPage() {
         </div>
       </div>
     </div>
+    </RequireAuth>
   );
 }

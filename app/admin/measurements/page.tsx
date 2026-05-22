@@ -2,135 +2,357 @@
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { getAllUsers } from "@/services/authService";
-import { saveMeasurement } from "@/services/measurementService";
+import { getCustomers } from "@/services/authService";
+import {
+  getAllMeasurements,
+  saveMeasurement,
+  updateMeasurement,
+  deleteMeasurement,
+} from "@/services/measurementService";
+import {
+  EMPTY_MEASUREMENT,
+  MEASUREMENT_FIELDS,
+  NECK_FIELDS,
+  LENGTH_FIELDS,
+  ALL_MEASUREMENT_FIELDS,
+  normalizeMeasurementForm,
+  countFilledFields,
+  type Customer,
+  type Measurement,
+  type MeasurementFieldConfig,
+} from "@/types";
+
+type FormState = typeof EMPTY_MEASUREMENT;
+
+function FieldGrid({
+  fields,
+  form,
+  onChange,
+}: {
+  fields: MeasurementFieldConfig[];
+  form: FormState;
+  onChange: (key: keyof FormState, value: string) => void;
+}) {
+  return (
+    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      {fields.map(({ key, label, placeholder }) => (
+        <div key={key}>
+          <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
+            {label}
+          </label>
+          <input
+            type="text"
+            className="input-field"
+            placeholder={placeholder}
+            value={form[key]}
+            onChange={(e) => onChange(key, e.target.value)}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DisplayFields({
+  m,
+  fields,
+}: {
+  m: Measurement;
+  fields: MeasurementFieldConfig[];
+}) {
+  return (
+    <>
+      {fields.map(({ key, label }) =>
+        m[key]?.trim() ? (
+          <div
+            key={key}
+            className="bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2"
+          >
+            <p className="text-[10px] uppercase tracking-wider text-white/35">
+              {label}
+            </p>
+            <p className="text-[#C9A84C] font-medium text-sm mt-0.5">
+              {m[key]}
+            </p>
+          </div>
+        ) : null
+      )}
+    </>
+  );
+}
 
 export default function AdminMeasurementsPage() {
-  const [users, setUsers] = useState<any[]>([]);
-  const [selectedUser, setSelectedUser] = useState("");
-  const [chest, setChest] = useState("");
-  const [waist, setWaist] = useState("");
-  const [shoulder, setShoulder] = useState("");
-  const [length, setLength] = useState("");
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [measurements, setMeasurements] = useState<Measurement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<FormState>({ ...EMPTY_MEASUREMENT });
 
-  const fetchUsers = async () => {
-    const data = await getAllUsers();
-    setUsers(data);
+  const customerMap = Object.fromEntries(
+    customers.map((c) => [c.uid, c.name])
+  );
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [customerData, measurementData] = await Promise.all([
+        getCustomers(),
+        getAllMeasurements(),
+      ]);
+      setCustomers(customerData);
+      setMeasurements(measurementData);
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const resetForm = () => {
+    setForm({ ...EMPTY_MEASUREMENT });
+    setEditingId(null);
+    setShowForm(false);
+  };
+
+  const openCreate = () => {
+    resetForm();
+    setShowForm(true);
+  };
+
+  const openEdit = (m: Measurement) => {
+    setEditingId(m.id);
+    setForm(normalizeMeasurementForm(m));
+    setShowForm(true);
+  };
+
+  const handleFieldChange = (key: keyof FormState, value: string) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!form.userId) {
+      toast.error("Please select a customer");
+      return;
+    }
+
+    const payload = {
+      ...form,
+      updatedByAdmin: true,
+    };
+
     try {
-      await saveMeasurement({
-        userId: selectedUser,
-        chest,
-        waist,
-        shoulder,
-        length,
-        updatedByAdmin: true,
-        createdAt: new Date(),
-      });
-
-      toast.success("Measurements Saved");
-
-      setSelectedUser("");
-      setChest("");
-      setWaist("");
-      setShoulder("");
-      setLength("");
+      if (editingId) {
+        await updateMeasurement(editingId, payload);
+        toast.success("Measurement updated");
+      } else {
+        await saveMeasurement(payload);
+        toast.success("Measurement created");
+      }
+      resetForm();
+      fetchData();
     } catch (error: any) {
       toast.error(error.message);
     }
   };
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+  const handleDelete = async (m: Measurement) => {
+    const name = customerMap[m.userId] || "this customer";
+    if (!confirm(`Delete measurement record for ${name}?`)) return;
+
+    try {
+      await deleteMeasurement(m.id);
+      toast.success("Measurement deleted");
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
 
   return (
     <div className="page-shell">
-      <div className="page-container max-w-2xl">
-        <p className="badge-gold mb-4">Fittings</p>
-        <h1 className="page-title">Measurements</h1>
-        <p className="page-subtitle">
-          Record precise measurements for your customers
-        </p>
-
-        <form onSubmit={handleSave} className="card-glass p-8 md:p-10 space-y-5">
+      <div className="page-container">
+        <div className="flex flex-wrap items-end justify-between gap-4 mb-2">
           <div>
-            <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
-              Customer
-            </label>
-            <select
-              className="input-field cursor-pointer"
-              value={selectedUser}
-              onChange={(e) => setSelectedUser(e.target.value)}
-            >
-              <option value="">Select Customer</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.uid}>
-                  {user.name} - {user.email}
-                </option>
-              ))}
-            </select>
+            <p className="badge-gold mb-4">Fittings</p>
+            <h1 className="page-title">Measurements</h1>
+            <p className="page-subtitle mb-0">
+              Create, edit, and manage customer measurements
+            </p>
           </div>
+          {!showForm && (
+            <button type="button" onClick={openCreate} className="btn-primary">
+              + Add Measurement
+            </button>
+          )}
+        </div>
 
-          <div className="grid sm:grid-cols-2 gap-5">
-            <div>
-              <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
-                Chest
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. 38"
-                className="input-field"
-                value={chest}
-                onChange={(e) => setChest(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
-                Waist
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. 32"
-                className="input-field"
-                value={waist}
-                onChange={(e) => setWaist(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
-                Shoulder
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. 16"
-                className="input-field"
-                value={shoulder}
-                onChange={(e) => setShoulder(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
-                Length
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. 42"
-                className="input-field"
-                value={length}
-                onChange={(e) => setLength(e.target.value)}
-              />
-            </div>
-          </div>
+        {showForm && (
+          <form
+            onSubmit={handleSubmit}
+            className="card-glass p-8 md:p-10 space-y-8 mt-10"
+          >
+            <h2 className="font-[family-name:var(--font-cormorant)] text-2xl text-white">
+              {editingId ? "Edit Measurement" : "New Measurement"}
+            </h2>
 
-          <button type="submit" className="btn-primary w-full sm:w-auto">
-            Save Measurements
-          </button>
-        </form>
+            <div>
+              <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
+                Customer *
+              </label>
+              <select
+                className="select-field max-w-md"
+                value={form.userId}
+                onChange={(e) => handleFieldChange("userId", e.target.value)}
+                required
+              >
+                <option value="">Select Customer</option>
+                {customers.map((c) => (
+                  <option key={c.uid} value={c.uid}>
+                    {c.name}
+                    {c.phoneNumber ? ` — ${c.phoneNumber}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-xs uppercase tracking-[0.25em] text-[#C9A84C]">
+                Body Measurements
+              </h3>
+              <FieldGrid
+                fields={MEASUREMENT_FIELDS}
+                form={form}
+                onChange={handleFieldChange}
+              />
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-xs uppercase tracking-[0.25em] text-[#C9A84C]">
+                Neck
+              </h3>
+              <p className="text-white/35 text-sm -mt-2">
+                Front and back neck depth — used for blouses, kurtis, and shirts.
+              </p>
+              <FieldGrid
+                fields={NECK_FIELDS}
+                form={form}
+                onChange={handleFieldChange}
+              />
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-xs uppercase tracking-[0.25em] text-[#C9A84C]">
+                Full Length (by garment)
+              </h3>
+              <p className="text-white/35 text-sm -mt-2">
+                Fill only the lengths you need — blouse, pant, or kurti. Leave
+                others blank.
+              </p>
+              <FieldGrid
+                fields={LENGTH_FIELDS}
+                form={form}
+                onChange={handleFieldChange}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
+                Notes
+              </label>
+              <textarea
+                className="input-field resize-none"
+                rows={3}
+                placeholder="Special fitting instructions, fabric notes…"
+                value={form.notes}
+                onChange={(e) => handleFieldChange("notes", e.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <button type="submit" className="btn-primary">
+                {editingId ? "Update" : "Save Measurement"}
+              </button>
+              <button
+                type="button"
+                onClick={resetForm}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+
+        <div className="mt-10 space-y-4">
+          {loading ? (
+            <div className="loading-screen">
+              <div className="spinner" />
+            </div>
+          ) : measurements.length === 0 ? (
+            <div className="card-glass p-12 text-center text-white/40">
+              No measurements yet.
+            </div>
+          ) : (
+            measurements.map((m) => {
+              const normalized = normalizeMeasurementForm(m);
+              const displayM = { ...m, ...normalized } as Measurement;
+
+              return (
+                <div key={m.id} className="card-glass p-6 md:p-8">
+                  <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
+                    <div>
+                      <h3 className="font-[family-name:var(--font-cormorant)] text-xl text-white">
+                        {customerMap[m.userId] || "Unknown customer"}
+                      </h3>
+                      <p className="text-white/35 text-xs mt-1 uppercase tracking-wider">
+                        {countFilledFields(displayM)} of{" "}
+                        {ALL_MEASUREMENT_FIELDS.length} fields recorded
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(m)}
+                        className="btn-secondary text-sm py-2.5 px-5"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(m)}
+                        className="btn-danger text-sm"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    <DisplayFields m={displayM} fields={MEASUREMENT_FIELDS} />
+                    <DisplayFields m={displayM} fields={NECK_FIELDS} />
+                    <DisplayFields m={displayM} fields={LENGTH_FIELDS} />
+                  </div>
+
+                  {displayM.notes?.trim() && (
+                    <p className="text-white/40 text-sm mt-4 border-t border-white/[0.06] pt-4">
+                      <span className="text-white/30 uppercase text-xs tracking-wider mr-2">
+                        Notes
+                      </span>
+                      {displayM.notes}
+                    </p>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
   );
