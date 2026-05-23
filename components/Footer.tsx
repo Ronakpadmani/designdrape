@@ -70,11 +70,11 @@ export default function Footer() {
             </p>
 
             <p>
-              support@designdrape.com
+              dipali20@gmail.com
             </p>
 
             <p>
-              +91 98765 43210
+              +91 96385 20472
             </p>
 
           </div>
