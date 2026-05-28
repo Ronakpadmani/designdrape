@@ -84,11 +84,7 @@ export default function AdminCustomersPage() {
         });
         toast.success("Customer updated");
       } else {
-        if (!form.email.trim() || !form.password.trim()) {
-          toast.error("Email and password are required for new customers");
-          return;
-        }
-        if (form.password.length < 6) {
+        if (form.password.trim() && form.password.length < 6) {
           toast.error("Password must be at least 6 characters");
           return;
         }
@@ -98,9 +94,9 @@ export default function AdminCustomersPage() {
           phoneNumber: form.phoneNumber.trim(),
           address: form.address.trim(),
           notes: form.notes.trim(),
-          password: form.password,
+          password: form.password.trim(),
         });
-        toast.success("Customer created — share login credentials with them");
+        toast.success("Customer created");
       }
 
       resetForm();
@@ -187,7 +183,7 @@ export default function AdminCustomersPage() {
               </div>
               <div>
                 <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
-                  Email {editingId ? "" : "*"}
+                  Email
                 </label>
                 <input
                   type="email"
@@ -197,13 +193,12 @@ export default function AdminCustomersPage() {
                     setForm({ ...form, email: e.target.value })
                   }
                   disabled={!!editingId}
-                  required={!editingId}
                 />
               </div>
               {!editingId && (
                 <div>
                   <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
-                    Password *
+                    Password
                   </label>
                   <input
                     type="password"
@@ -213,7 +208,6 @@ export default function AdminCustomersPage() {
                     onChange={(e) =>
                       setForm({ ...form, password: e.target.value })
                     }
-                    required
                   />
                 </div>
               )}

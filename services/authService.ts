@@ -5,14 +5,15 @@ import {
 } from "firebase/auth";
 
 import {
+  addDoc,
+  collection,
   doc,
   setDoc,
   getDoc,
   updateDoc,
   deleteDoc,
 } from "firebase/firestore";
-
-import { collection, getDocs } from "firebase/firestore";
+import { getDocs } from "firebase/firestore";
 
 import { auth, secondaryAuth, db } from "@/firebase/firebaseConfig";
 
@@ -43,27 +44,50 @@ export const getCustomers = async (): Promise<Customer[]> => {
 // ADMIN — CREATE CUSTOMER (Auth + Firestore)
 export const createCustomerByAdmin = async (data: {
   name: string;
-  email: string;
+  email?: string;
   phoneNumber: string;
   address?: string;
   notes?: string;
-  password: string;
+  password?: string;
 }) => {
-  const userCredential = await createUserWithEmailAndPassword(
-    secondaryAuth,
-    data.email,
-    data.password
-  );
+  const email = data.email?.trim() || "";
+  const password = data.password || "";
+  const hasLoginCredentials = Boolean(email && password);
 
-  // Keep admin session — sign out secondary only
-  await signOut(secondaryAuth);
+  if (hasLoginCredentials && password.length < 6) {
+    throw new Error("Password must be at least 6 characters");
+  }
 
-  const user = userCredential.user;
+  if (hasLoginCredentials) {
+    const userCredential = await createUserWithEmailAndPassword(
+      secondaryAuth,
+      email,
+      password
+    );
 
-  await setDoc(doc(db, "users", user.uid), {
-    uid: user.uid,
+    // Keep admin session — sign out secondary only
+    await signOut(secondaryAuth);
+
+    const user = userCredential.user;
+
+    await setDoc(doc(db, "users", user.uid), {
+      uid: user.uid,
+      name: data.name,
+      email,
+      phoneNumber: data.phoneNumber,
+      address: data.address || "",
+      notes: data.notes || "",
+      role: "customer",
+      createdAt: new Date(),
+      createdByAdmin: true,
+    });
+
+    return user.uid;
+  }
+
+  const docRef = await addDoc(collection(db, "users"), {
     name: data.name,
-    email: data.email,
+    email: "",
     phoneNumber: data.phoneNumber,
     address: data.address || "",
     notes: data.notes || "",
@@ -72,7 +96,11 @@ export const createCustomerByAdmin = async (data: {
     createdByAdmin: true,
   });
 
-  return user.uid;
+  await updateDoc(doc(db, "users", docRef.id), {
+    uid: docRef.id,
+  });
+
+  return docRef.id;
 };
 
 // ADMIN — UPDATE CUSTOMER PROFILE

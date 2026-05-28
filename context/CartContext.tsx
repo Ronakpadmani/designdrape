@@ -33,6 +33,7 @@ type CartContextType = {
   decreaseQuantity: (
     id: string
   ) => void;
+  clearCart: () => void;
 };
 
 const CartContext =
@@ -46,6 +47,7 @@ const CartContext =
     increaseQuantity: () => {},
 
     decreaseQuantity: () => {},
+    clearCart: () => {},
   });
 
 export const CartProvider = ({
@@ -191,6 +193,10 @@ export const CartProvider = ({
     );
   };
 
+  const clearCart = () => {
+    setCartItems([]);
+  };
+
   return (
 
     <CartContext.Provider
@@ -200,6 +206,7 @@ export const CartProvider = ({
         removeFromCart,
         increaseQuantity,
         decreaseQuantity,
+        clearCart,
       }}
     >
 

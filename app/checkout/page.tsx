@@ -10,7 +10,7 @@ import RequireAuth from "@/components/RequireAuth";
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cartItems } = useCart();
+  const { cartItems, clearCart } = useCart();
   const { user, userData } = useAuth();
   const [address, setAddress] = useState("");
 
@@ -44,6 +44,7 @@ export default function CheckoutPage() {
       });
 
       toast.success("Order Placed Successfully");
+      clearCart();
 
       router.push("/orders");
     } catch (error: any) {
