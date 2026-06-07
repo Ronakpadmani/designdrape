@@ -105,7 +105,7 @@ export default function Navbar() {
               </Link>
               <Link
                 href="/register"
-                className="hidden sm:block bg-[#C9A84C] text-black text-sm font-semibold tracking-widest uppercase px-5 py-2.5 rounded-full hover:bg-[#dbbe60] hover:shadow-[0_0_24px_rgba(201,168,76,0.35)] transition-all duration-300"
+                className="hidden sm:block text-white/55 text-sm tracking-widest uppercase hover:text-[#C9A84C] transition-colors px-2"
               >
                 Register
               </Link>
@@ -194,7 +194,7 @@ export default function Navbar() {
                   </Link>
                   <Link
                     href="/register"
-                    className="btn-primary text-center text-sm"
+                    className="text-white/55 text-sm tracking-widest uppercase"
                     onClick={() => setMobileOpen(false)}
                   >
                     Register
