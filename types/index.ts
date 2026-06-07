@@ -11,6 +11,25 @@ export type Customer = {
   createdByAdmin?: boolean;
 };
 
+export type GarmentLengthKey =
+  | "blouse"
+  | "pant"
+  | "kurti"
+  | "lehenga"
+  | "gown"
+  | "shirt";
+
+export type GarmentLengths = {
+  blouse?: string;
+  pant?: string;
+  kurti?: string;
+  lehenga?: string;
+  gown?: string;
+  shirt?: string;
+  otherName?: string;
+  otherValue?: string;
+};
+
 export type Measurement = {
   id: string;
   userId: string;
@@ -21,15 +40,30 @@ export type Measurement = {
   frontNeck: string;
   backNeck: string;
   sleeve: string;
-  blouseLength: string;
-  pantLength: string;
-  kurtiLength: string;
+  garmentLengths?: GarmentLengths;
+  /** @deprecated — migrated to garmentLengths */
+  blouseLength?: string;
+  /** @deprecated — migrated to garmentLengths */
+  pantLength?: string;
+  /** @deprecated — migrated to garmentLengths */
+  kurtiLength?: string;
   thigh: string;
   cuff: string;
   notes: string;
   updatedByAdmin?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
+};
+
+export const EMPTY_GARMENT_LENGTHS: Required<GarmentLengths> = {
+  blouse: "",
+  pant: "",
+  kurti: "",
+  lehenga: "",
+  gown: "",
+  shirt: "",
+  otherName: "",
+  otherValue: "",
 };
 
 export const EMPTY_MEASUREMENT = {
@@ -41,21 +75,21 @@ export const EMPTY_MEASUREMENT = {
   frontNeck: "",
   backNeck: "",
   sleeve: "",
-  blouseLength: "",
-  pantLength: "",
-  kurtiLength: "",
+  garmentLengths: { ...EMPTY_GARMENT_LENGTHS },
   thigh: "",
   cuff: "",
   notes: "",
 };
 
-type MeasurementFieldKey = keyof Omit<
-  Measurement,
-  "id" | "userId" | "updatedByAdmin" | "createdAt" | "updatedAt"
+export type MeasurementFormState = typeof EMPTY_MEASUREMENT;
+
+type BodyFieldKey = keyof Omit<
+  MeasurementFormState,
+  "garmentLengths"
 >;
 
 export type MeasurementFieldConfig = {
-  key: MeasurementFieldKey;
+  key: BodyFieldKey;
   label: string;
   placeholder: string;
 };
@@ -77,23 +111,53 @@ export const NECK_FIELDS: MeasurementFieldConfig[] = [
   { key: "backNeck", label: "Back Neck", placeholder: 'e.g. 8"' },
 ];
 
-/** Full length — per garment type (fill only what you stitch) */
-export const LENGTH_FIELDS: MeasurementFieldConfig[] = [
-  { key: "blouseLength", label: "Blouse Length", placeholder: 'e.g. 14"' },
-  { key: "pantLength", label: "Pant Length", placeholder: 'e.g. 40"' },
-  { key: "kurtiLength", label: "Kurti Length", placeholder: 'e.g. 42"' },
+export const GARMENT_LENGTH_PRESETS: {
+  key: GarmentLengthKey;
+  label: string;
+  placeholder: string;
+}[] = [
+  { key: "blouse", label: "Blouse", placeholder: 'e.g. 14"' },
+  { key: "pant", label: "Pant", placeholder: 'e.g. 40"' },
+  { key: "kurti", label: "Kurti", placeholder: 'e.g. 42"' },
+  { key: "lehenga", label: "Lehenga", placeholder: 'e.g. 42"' },
+  { key: "gown", label: "Gown", placeholder: 'e.g. 55"' },
+  { key: "shirt", label: "Shirt", placeholder: 'e.g. 28"' },
 ];
 
-export const ALL_MEASUREMENT_FIELDS: MeasurementFieldConfig[] = [
-  ...MEASUREMENT_FIELDS,
-  ...NECK_FIELDS,
-  ...LENGTH_FIELDS,
-];
+/** Max garment length slots (6 presets + 1 other) */
+export const GARMENT_LENGTH_SLOT_COUNT = GARMENT_LENGTH_PRESETS.length + 1;
 
-/** Map old Firestore records to the new shape when editing */
+export const BASE_MEASUREMENT_FIELD_COUNT =
+  MEASUREMENT_FIELDS.length + NECK_FIELDS.length;
+
+export const TOTAL_MEASUREMENT_SLOT_COUNT =
+  BASE_MEASUREMENT_FIELD_COUNT + GARMENT_LENGTH_SLOT_COUNT;
+
+function migrateLegacyLengths(
+  m: Partial<Measurement> & Record<string, unknown>
+): typeof EMPTY_GARMENT_LENGTHS {
+  const existing = (m.garmentLengths as GarmentLengths) || {};
+
+  return {
+    blouse: existing.blouse || (m.blouseLength as string) || "",
+    pant: existing.pant || (m.pantLength as string) || "",
+    kurti:
+      existing.kurti ||
+      (m.kurtiLength as string) ||
+      (m.length as string) ||
+      "",
+    lehenga: existing.lehenga || "",
+    gown: existing.gown || "",
+    shirt: existing.shirt || "",
+    otherName: existing.otherName || "",
+    otherValue: existing.otherValue || "",
+  };
+}
+
+/** Map Firestore records to the form shape (includes legacy length migration) */
 export function normalizeMeasurementForm(
   m: Partial<Measurement> & Record<string, unknown>
-): typeof EMPTY_MEASUREMENT {
+): MeasurementFormState {
   return {
     userId: (m.userId as string) || "",
     chest: (m.chest as string) || "",
@@ -103,15 +167,78 @@ export function normalizeMeasurementForm(
     frontNeck: (m.frontNeck as string) || (m.neck as string) || "",
     backNeck: (m.backNeck as string) || "",
     sleeve: (m.sleeve as string) || "",
-    blouseLength: (m.blouseLength as string) || "",
-    pantLength: (m.pantLength as string) || "",
-    kurtiLength: (m.kurtiLength as string) || (m.length as string) || "",
+    garmentLengths: migrateLegacyLengths(m),
     thigh: (m.thigh as string) || "",
     cuff: (m.cuff as string) || "",
     notes: (m.notes as string) || "",
   };
 }
 
-export function countFilledFields(m: Measurement): number {
-  return ALL_MEASUREMENT_FIELDS.filter((f) => m[f.key]?.trim()).length;
+export function sanitizeGarmentLengths(
+  lengths: GarmentLengths
+): GarmentLengths {
+  const cleaned: GarmentLengths = {};
+
+  for (const { key } of GARMENT_LENGTH_PRESETS) {
+    const value = lengths[key]?.trim();
+    if (value) cleaned[key] = value;
+  }
+
+  const otherName = lengths.otherName?.trim();
+  const otherValue = lengths.otherValue?.trim();
+  if (otherName && otherValue) {
+    cleaned.otherName = otherName;
+    cleaned.otherValue = otherValue;
+  }
+
+  return cleaned;
+}
+
+export function countFilledGarmentLengths(lengths?: GarmentLengths): number {
+  if (!lengths) return 0;
+
+  let count = GARMENT_LENGTH_PRESETS.filter((p) =>
+    lengths[p.key]?.trim()
+  ).length;
+
+  if (lengths.otherName?.trim() && lengths.otherValue?.trim()) {
+    count += 1;
+  }
+
+  return count;
+}
+
+export function getGarmentLengthDisplayEntries(
+  lengths?: GarmentLengths
+): { label: string; value: string }[] {
+  if (!lengths) return [];
+
+  const entries: { label: string; value: string }[] = [];
+
+  for (const { key, label } of GARMENT_LENGTH_PRESETS) {
+    const value = lengths[key]?.trim();
+    if (value) entries.push({ label, value });
+  }
+
+  if (lengths.otherName?.trim() && lengths.otherValue?.trim()) {
+    entries.push({
+      label: lengths.otherName.trim(),
+      value: lengths.otherValue.trim(),
+    });
+  }
+
+  return entries;
+}
+
+export function countFilledFields(m: Measurement | MeasurementFormState): number {
+  const bodyCount = [...MEASUREMENT_FIELDS, ...NECK_FIELDS].filter((f) =>
+    m[f.key]?.trim()
+  ).length;
+
+  const lengths =
+    "garmentLengths" in m && m.garmentLengths
+      ? m.garmentLengths
+      : migrateLegacyLengths(m as Partial<Measurement>);
+
+  return bodyCount + countFilledGarmentLengths(lengths);
 }

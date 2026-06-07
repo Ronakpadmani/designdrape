@@ -7,21 +7,32 @@ import {
   doc,
   updateDoc,
   deleteDoc,
+  deleteField,
 } from "firebase/firestore";
 
 import { db } from "@/firebase/firebaseConfig";
 
-import type { Measurement } from "@/types";
+import { sanitizeGarmentLengths, type Measurement } from "@/types";
 
 export type MeasurementInput = Omit<
   Measurement,
   "id" | "createdAt" | "updatedAt"
 >;
 
+function buildMeasurementDoc(data: MeasurementInput) {
+  const { garmentLengths, blouseLength, pantLength, kurtiLength, ...rest } =
+    data;
+
+  return {
+    ...rest,
+    garmentLengths: sanitizeGarmentLengths(garmentLengths || {}),
+  };
+}
+
 // CREATE
 export const saveMeasurement = async (measurementData: MeasurementInput) => {
   return await addDoc(collection(db, "measurements"), {
-    ...measurementData,
+    ...buildMeasurementDoc(measurementData),
     createdAt: new Date(),
     updatedAt: new Date(),
   });
@@ -75,7 +86,10 @@ export const updateMeasurement = async (
   measurementData: MeasurementInput
 ) => {
   await updateDoc(doc(db, "measurements", id), {
-    ...measurementData,
+    ...buildMeasurementDoc(measurementData),
+    blouseLength: deleteField(),
+    pantLength: deleteField(),
+    kurtiLength: deleteField(),
     updatedAt: new Date(),
   });
 };

@@ -9,20 +9,22 @@ import {
   updateMeasurement,
   deleteMeasurement,
 } from "@/services/measurementService";
+import LengthSection from "@/components/measurements/LengthSection";
 import {
   EMPTY_MEASUREMENT,
   MEASUREMENT_FIELDS,
   NECK_FIELDS,
-  LENGTH_FIELDS,
-  ALL_MEASUREMENT_FIELDS,
+  TOTAL_MEASUREMENT_SLOT_COUNT,
   normalizeMeasurementForm,
   countFilledFields,
+  countFilledGarmentLengths,
+  getGarmentLengthDisplayEntries,
   type Customer,
   type Measurement,
   type MeasurementFieldConfig,
+  type MeasurementFormState,
+  type GarmentLengths,
 } from "@/types";
-
-type FormState = typeof EMPTY_MEASUREMENT;
 
 function FieldGrid({
   fields,
@@ -30,8 +32,8 @@ function FieldGrid({
   onChange,
 }: {
   fields: MeasurementFieldConfig[];
-  form: FormState;
-  onChange: (key: keyof FormState, value: string) => void;
+  form: MeasurementFormState;
+  onChange: (key: keyof MeasurementFormState, value: string) => void;
 }) {
   return (
     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -44,7 +46,7 @@ function FieldGrid({
             type="text"
             className="input-field"
             placeholder={placeholder}
-            value={form[key]}
+            value={form[key] as string}
             onChange={(e) => onChange(key, e.target.value)}
           />
         </div>
@@ -57,13 +59,13 @@ function DisplayFields({
   m,
   fields,
 }: {
-  m: Measurement;
+  m: MeasurementFormState;
   fields: MeasurementFieldConfig[];
 }) {
   return (
     <>
       {fields.map(({ key, label }) =>
-        m[key]?.trim() ? (
+        m[key]?.toString().trim() ? (
           <div
             key={key}
             className="bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2"
@@ -81,13 +83,36 @@ function DisplayFields({
   );
 }
 
+function DisplayGarmentLengths({ lengths }: { lengths?: GarmentLengths }) {
+  const entries = getGarmentLengthDisplayEntries(lengths);
+
+  return (
+    <>
+      {entries.map(({ label, value }) => (
+        <div
+          key={`${label}-${value}`}
+          className="bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2"
+        >
+          <p className="text-[10px] uppercase tracking-wider text-white/35">
+            {label}
+          </p>
+          <p className="text-[#C9A84C] font-medium text-sm mt-0.5">{value}</p>
+        </div>
+      ))}
+    </>
+  );
+}
+
 export default function AdminMeasurementsPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>({ ...EMPTY_MEASUREMENT });
+  const [form, setForm] = useState<MeasurementFormState>({
+    ...EMPTY_MEASUREMENT,
+  });
+  const [lengthDefaultOpen, setLengthDefaultOpen] = useState(false);
 
   const customerMap = Object.fromEntries(
     customers.map((c) => [c.uid, c.name])
@@ -114,24 +139,44 @@ export default function AdminMeasurementsPage() {
   }, []);
 
   const resetForm = () => {
-    setForm({ ...EMPTY_MEASUREMENT });
+    setForm({ ...EMPTY_MEASUREMENT, garmentLengths: { ...EMPTY_MEASUREMENT.garmentLengths } });
     setEditingId(null);
+    setLengthDefaultOpen(false);
     setShowForm(false);
   };
 
   const openCreate = () => {
-    resetForm();
+    setForm({ ...EMPTY_MEASUREMENT, garmentLengths: { ...EMPTY_MEASUREMENT.garmentLengths } });
+    setEditingId(null);
+    setLengthDefaultOpen(false);
     setShowForm(true);
   };
 
   const openEdit = (m: Measurement) => {
+    const normalized = normalizeMeasurementForm(m);
     setEditingId(m.id);
-    setForm(normalizeMeasurementForm(m));
+    setForm(normalized);
+    setLengthDefaultOpen(
+      countFilledGarmentLengths(normalized.garmentLengths) > 0
+    );
     setShowForm(true);
   };
 
-  const handleFieldChange = (key: keyof FormState, value: string) => {
+  const handleFieldChange = (
+    key: keyof MeasurementFormState,
+    value: string
+  ) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleGarmentLengthChange = (
+    key: keyof GarmentLengths,
+    value: string
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      garmentLengths: { ...prev.garmentLengths, [key]: value },
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -247,20 +292,12 @@ export default function AdminMeasurementsPage() {
               />
             </div>
 
-            <div className="space-y-4">
-              <h3 className="text-xs uppercase tracking-[0.25em] text-[#C9A84C]">
-                Full Length (by garment)
-              </h3>
-              <p className="text-white/35 text-sm -mt-2">
-                Fill only the lengths you need — blouse, pant, or kurti. Leave
-                others blank.
-              </p>
-              <FieldGrid
-                fields={LENGTH_FIELDS}
-                form={form}
-                onChange={handleFieldChange}
-              />
-            </div>
+            <LengthSection
+              key={`${editingId ?? "new"}-${lengthDefaultOpen}`}
+              garmentLengths={form.garmentLengths}
+              onChange={handleGarmentLengthChange}
+              defaultOpen={lengthDefaultOpen}
+            />
 
             <div>
               <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
@@ -302,7 +339,6 @@ export default function AdminMeasurementsPage() {
           ) : (
             measurements.map((m) => {
               const normalized = normalizeMeasurementForm(m);
-              const displayM = { ...m, ...normalized } as Measurement;
 
               return (
                 <div key={m.id} className="card-glass p-6 md:p-8">
@@ -312,8 +348,8 @@ export default function AdminMeasurementsPage() {
                         {customerMap[m.userId] || "Unknown customer"}
                       </h3>
                       <p className="text-white/35 text-xs mt-1 uppercase tracking-wider">
-                        {countFilledFields(displayM)} of{" "}
-                        {ALL_MEASUREMENT_FIELDS.length} fields recorded
+                        {countFilledFields(normalized)} of{" "}
+                        {TOTAL_MEASUREMENT_SLOT_COUNT} fields recorded
                       </p>
                     </div>
                     <div className="flex gap-3">
@@ -335,17 +371,17 @@ export default function AdminMeasurementsPage() {
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                    <DisplayFields m={displayM} fields={MEASUREMENT_FIELDS} />
-                    <DisplayFields m={displayM} fields={NECK_FIELDS} />
-                    <DisplayFields m={displayM} fields={LENGTH_FIELDS} />
+                    <DisplayFields m={normalized} fields={MEASUREMENT_FIELDS} />
+                    <DisplayFields m={normalized} fields={NECK_FIELDS} />
+                    <DisplayGarmentLengths lengths={normalized.garmentLengths} />
                   </div>
 
-                  {displayM.notes?.trim() && (
+                  {normalized.notes?.trim() && (
                     <p className="text-white/40 text-sm mt-4 border-t border-white/[0.06] pt-4">
                       <span className="text-white/30 uppercase text-xs tracking-wider mr-2">
                         Notes
                       </span>
-                      {displayM.notes}
+                      {normalized.notes}
                     </p>
                   )}
                 </div>
