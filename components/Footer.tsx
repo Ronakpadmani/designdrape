@@ -94,11 +94,15 @@ export default function Footer() {
 
           <div className="flex gap-5">
 
-            <div className="bg-white/10 p-4 rounded-full hover:bg-yellow-500 hover:text-black transition cursor-pointer">
-
-              <FaInstagram size={22} />
-
-            </div>
+            <a
+  href="https://www.instagram.com/designdrape.in/"
+  target="_blank"
+  rel="noopener noreferrer"
+  aria-label="Follow DesignDrape on Instagram"
+  className="bg-white/10 p-4 rounded-full hover:bg-yellow-500 hover:text-black transition cursor-pointer"
+>
+  <FaInstagram size={22} />
+</a>
 
             <div className="bg-white/10 p-4 rounded-full hover:bg-yellow-500 hover:text-black transition cursor-pointer">
 
