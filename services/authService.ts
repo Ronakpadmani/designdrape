@@ -5,21 +5,27 @@ import {
 } from "firebase/auth";
 
 import {
-  addDoc,
   collection,
   doc,
   setDoc,
   getDoc,
   updateDoc,
   deleteDoc,
+  getDocs,
 } from "firebase/firestore";
-import { getDocs } from "firebase/firestore";
 
 import { auth, secondaryAuth, db } from "@/firebase/firebaseConfig";
 
+import {
+  normalizePhone,
+  phoneToAuthEmail,
+  validatePin,
+  isPhoneInUse,
+  mapAuthError,
+} from "@/lib/phoneAuth";
+
 import type { Customer } from "@/types";
 
-// GET ALL USERS (including admins)
 export const getAllUsers = async () => {
   const querySnapshot = await getDocs(collection(db, "users"));
 
@@ -35,75 +41,60 @@ export const getAllUsers = async () => {
   return users;
 };
 
-// GET CUSTOMERS ONLY
 export const getCustomers = async (): Promise<Customer[]> => {
   const users = await getAllUsers();
   return users.filter((u) => u.role === "customer") as Customer[];
 };
 
-// ADMIN — CREATE CUSTOMER (Auth + Firestore)
 export const createCustomerByAdmin = async (data: {
   name: string;
-  email?: string;
   phoneNumber: string;
+  pin: string;
   address?: string;
   notes?: string;
-  password?: string;
 }) => {
-  const email = data.email?.trim() || "";
-  const password = data.password || "";
-  const hasLoginCredentials = Boolean(email && password);
-
-  if (hasLoginCredentials && password.length < 6) {
-    throw new Error("Password must be at least 6 characters");
+  const phone = normalizePhone(data.phoneNumber);
+  if (!phone) {
+    throw new Error("Please enter a valid 10-digit mobile number");
   }
 
-  if (hasLoginCredentials) {
+  if (!validatePin(data.pin)) {
+    throw new Error("PIN must be exactly 6 digits");
+  }
+
+  if (await isPhoneInUse(phone)) {
+    throw new Error("Mobile number already used");
+  }
+
+  try {
     const userCredential = await createUserWithEmailAndPassword(
       secondaryAuth,
-      email,
-      password
+      phoneToAuthEmail(phone),
+      data.pin
     );
 
-    // Keep admin session — sign out secondary only
     await signOut(secondaryAuth);
 
     const user = userCredential.user;
 
     await setDoc(doc(db, "users", user.uid), {
       uid: user.uid,
-      name: data.name,
-      email,
-      phoneNumber: data.phoneNumber,
-      address: data.address || "",
-      notes: data.notes || "",
+      name: data.name.trim(),
+      email: "",
+      phoneNumber: phone,
+      address: data.address?.trim() || "",
+      notes: data.notes?.trim() || "",
       role: "customer",
       createdAt: new Date(),
       createdByAdmin: true,
     });
 
     return user.uid;
+  } catch (error) {
+    throw new Error(mapAuthError(error));
   }
-
-  const docRef = await addDoc(collection(db, "users"), {
-    name: data.name,
-    email: "",
-    phoneNumber: data.phoneNumber,
-    address: data.address || "",
-    notes: data.notes || "",
-    role: "customer",
-    createdAt: new Date(),
-    createdByAdmin: true,
-  });
-
-  await updateDoc(doc(db, "users", docRef.id), {
-    uid: docRef.id,
-  });
-
-  return docRef.id;
 };
 
-// ADMIN — UPDATE CUSTOMER PROFILE
 export const updateCustomer = async (
   uid: string,
   data: {
@@ -114,58 +105,124 @@ export const updateCustomer = async (
   }
 ) => {
   await updateDoc(doc(db, "users", uid), {
-    name: data.name,
-    phoneNumber: data.phoneNumber,
-    address: data.address || "",
-    notes: data.notes || "",
+    name: data.name.trim(),
+    phoneNumber: data.phoneNumber.trim(),
+    address: data.address?.trim() || "",
+    notes: data.notes?.trim() || "",
     updatedAt: new Date(),
   });
 };
 
-// ADMIN — DELETE CUSTOMER (Firestore profile only)
+export const resetCustomerPin = async (uid: string, newPin: string) => {
+  if (!validatePin(newPin)) {
+    throw new Error("PIN must be exactly 6 digits");
+  }
+
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error("You must be logged in as admin");
+  }
+
+  const token = await currentUser.getIdToken();
+
+  const res = await fetch("/api/customers/reset-pin", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ uid, newPin }),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.error || "Failed to reset PIN");
+  }
+};
+
 export const deleteCustomer = async (uid: string) => {
   await deleteDoc(doc(db, "users", uid));
 };
 
-// REGISTER USER (self-signup)
 export const registerUser = async (
   name: string,
-  email: string,
-  password: string
+  phoneInput: string,
+  pin: string
 ) => {
-  const userCredential = await createUserWithEmailAndPassword(
-    auth,
-    email,
-    password
-  );
+  const phone = normalizePhone(phoneInput);
+  if (!phone) {
+    throw new Error("Please enter a valid 10-digit mobile number");
+  }
 
-  const user = userCredential.user;
+  if (!validatePin(pin)) {
+    throw new Error("PIN must be exactly 6 digits");
+  }
 
-  await setDoc(doc(db, "users", user.uid), {
-    uid: user.uid,
-    name,
-    email,
-    phoneNumber: "",
-    address: "",
-    notes: "",
-    role: "customer",
-    createdAt: new Date(),
-  });
+  if (await isPhoneInUse(phone)) {
+    throw new Error("Mobile number already used");
+  }
 
-  return userCredential;
+  try {
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      phoneToAuthEmail(phone),
+      pin
+    );
+
+    const user = userCredential.user;
+
+    await setDoc(doc(db, "users", user.uid), {
+      uid: user.uid,
+      name: name.trim(),
+      email: "",
+      phoneNumber: phone,
+      address: "",
+      notes: "",
+      role: "customer",
+      createdAt: new Date(),
+    });
+
+    return userCredential;
+  } catch (error) {
+    throw new Error(mapAuthError(error));
+  }
 };
 
-// LOGIN USER
-export const loginUser = async (email: string, password: string) => {
-  return await signInWithEmailAndPassword(auth, email, password);
+export const loginUser = async (phoneInput: string, pin: string) => {
+  const phone = normalizePhone(phoneInput);
+  if (!phone) {
+    throw new Error("Please enter a valid 10-digit mobile number");
+  }
+
+  if (!validatePin(pin)) {
+    throw new Error("PIN must be exactly 6 digits");
+  }
+
+  try {
+    return await signInWithEmailAndPassword(
+      auth,
+      phoneToAuthEmail(phone),
+      pin
+    );
+  } catch (error) {
+    throw new Error(mapAuthError(error));
+  }
 };
 
-// LOGOUT
+/** Admin login — email + password (legacy admin accounts) */
+export const loginAdmin = async (email: string, password: string) => {
+  try {
+    return await signInWithEmailAndPassword(auth, email.trim(), password);
+  } catch (error) {
+    throw new Error(mapAuthError(error));
+  }
+};
+
 export const logoutUser = async () => {
   return await signOut(auth);
 };
 
-// GET USER ROLE
 export const getUserRole = async (uid: string) => {
   const userDoc = await getDoc(doc(db, "users", uid));
   return userDoc.data();

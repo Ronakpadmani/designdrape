@@ -6,17 +6,19 @@ import {
   getCustomers,
   createCustomerByAdmin,
   updateCustomer,
+  resetCustomerPin,
   deleteCustomer,
 } from "@/services/authService";
+import { formatPhoneDisplay } from "@/lib/phoneAuth";
 import type { Customer } from "@/types";
 
 const emptyForm = {
   name: "",
-  email: "",
   phoneNumber: "",
+  pin: "",
+  newPin: "",
   address: "",
   notes: "",
-  password: "",
 };
 
 export default function AdminCustomersPage() {
@@ -57,11 +59,11 @@ export default function AdminCustomersPage() {
     setEditingId(customer.uid);
     setForm({
       name: customer.name || "",
-      email: customer.email || "",
       phoneNumber: customer.phoneNumber || "",
+      pin: "",
+      newPin: "",
       address: customer.address || "",
       notes: customer.notes || "",
-      password: "",
     });
     setShowForm(true);
   };
@@ -82,21 +84,27 @@ export default function AdminCustomersPage() {
           address: form.address.trim(),
           notes: form.notes.trim(),
         });
-        toast.success("Customer updated");
+
+        if (form.newPin.trim()) {
+          await resetCustomerPin(editingId, form.newPin.trim());
+          toast.success("Customer updated and PIN reset");
+        } else {
+          toast.success("Customer updated");
+        }
       } else {
-        if (form.password.trim() && form.password.length < 6) {
-          toast.error("Password must be at least 6 characters");
+        if (!form.pin.trim()) {
+          toast.error("PIN is required for new customers");
           return;
         }
+
         await createCustomerByAdmin({
           name: form.name.trim(),
-          email: form.email.trim(),
           phoneNumber: form.phoneNumber.trim(),
+          pin: form.pin.trim(),
           address: form.address.trim(),
           notes: form.notes.trim(),
-          password: form.password.trim(),
         });
-        toast.success("Customer created");
+        toast.success("Customer created — they can login with phone + PIN");
       }
 
       resetForm();
@@ -132,7 +140,7 @@ export default function AdminCustomersPage() {
             <p className="badge-gold mb-4">Clients</p>
             <h1 className="page-title">Customers</h1>
             <p className="page-subtitle mb-0">
-              Add and manage customer accounts
+              Add customers with mobile + PIN so they can login and order online
             </p>
           </div>
           {!showForm && (
@@ -172,45 +180,66 @@ export default function AdminCustomersPage() {
                 </label>
                 <input
                   type="tel"
+                  inputMode="numeric"
                   className="input-field"
-                  placeholder="+91 98765 43210"
+                  placeholder="10-digit mobile number"
                   value={form.phoneNumber}
                   onChange={(e) =>
                     setForm({ ...form, phoneNumber: e.target.value })
                   }
+                  disabled={!!editingId}
                   required
                 />
+                {editingId && (
+                  <p className="text-white/30 text-xs mt-1">
+                    Phone cannot be changed (used for login)
+                  </p>
+                )}
               </div>
-              <div>
-                <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  className="input-field disabled:opacity-50"
-                  value={form.email}
-                  onChange={(e) =>
-                    setForm({ ...form, email: e.target.value })
-                  }
-                  disabled={!!editingId}
-                />
-              </div>
-              {!editingId && (
+
+              {!editingId ? (
                 <div>
                   <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
-                    Password
+                    6-Digit PIN *
                   </label>
                   <input
                     type="password"
+                    inputMode="numeric"
                     className="input-field"
-                    placeholder="Min. 6 characters"
-                    value={form.password}
+                    placeholder="Set login PIN for customer"
+                    value={form.pin}
                     onChange={(e) =>
-                      setForm({ ...form, password: e.target.value })
+                      setForm({
+                        ...form,
+                        pin: e.target.value.replace(/\D/g, "").slice(0, 6),
+                      })
                     }
+                    maxLength={6}
+                    required
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
+                    New PIN (optional)
+                  </label>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    className="input-field"
+                    placeholder="Reset to new 6-digit PIN"
+                    value={form.newPin}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        newPin: e.target.value.replace(/\D/g, "").slice(0, 6),
+                      })
+                    }
+                    maxLength={6}
                   />
                 </div>
               )}
+
               <div className="sm:col-span-2">
                 <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
                   Address
@@ -271,15 +300,21 @@ export default function AdminCustomersPage() {
                 className="card-glass p-6 flex flex-col md:flex-row md:items-center justify-between gap-4"
               >
                 <div>
-                  <h3 className="font-[family-name:var(--font-cormorant)] text-xl text-white">
-                    {customer.name}
-                  </h3>
-                  <p className="text-white/45 text-sm mt-1">
-                    {customer.phoneNumber || "—"}
-                    {customer.email && (
-                      <span className="mx-2 text-white/20">|</span>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h3 className="font-[family-name:var(--font-cormorant)] text-xl text-white">
+                      {customer.name}
+                    </h3>
+                    <span className="badge-gold text-[10px]">Can login</span>
+                    {customer.createdByAdmin && (
+                      <span className="text-[10px] uppercase tracking-wider text-white/35 border border-white/10 px-2 py-0.5 rounded-full">
+                        Shop account
+                      </span>
                     )}
-                    {customer.email}
+                  </div>
+                  <p className="text-[#C9A84C] text-sm mt-1 font-medium">
+                    {customer.phoneNumber
+                      ? formatPhoneDisplay(customer.phoneNumber)
+                      : "—"}
                   </p>
                   {customer.address && (
                     <p className="text-white/35 text-sm mt-1">

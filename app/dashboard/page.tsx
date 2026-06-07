@@ -3,6 +3,7 @@
 import { useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { logoutUser } from "@/services/authService";
+import { formatPhoneDisplay } from "@/lib/phoneAuth";
 import toast from "react-hot-toast";
 
 export default function DashboardPage() {
@@ -15,7 +16,7 @@ export default function DashboardPage() {
     }
   };
 
-  const { user, loading } = useAuth();
+  const { user, userData, loading } = useAuth();
 
   if (loading) {
     return (
@@ -25,6 +26,11 @@ export default function DashboardPage() {
       </div>
     );
   }
+
+  const displayName = userData?.name || "User";
+  const displayPhone = userData?.phoneNumber
+    ? formatPhoneDisplay(userData.phoneNumber)
+    : "—";
 
   return (
     <ProtectedRoute>
@@ -38,22 +44,22 @@ export default function DashboardPage() {
             <div className="card-glass p-8 md:p-10 space-y-6">
               <div className="flex items-center gap-5 pb-6 border-b border-white/[0.08]">
                 <div className="w-16 h-16 rounded-full bg-[#C9A84C]/15 border border-[#C9A84C]/30 flex items-center justify-center text-[#C9A84C] text-2xl font-semibold uppercase">
-                  {user.email?.charAt(0) ?? "U"}
+                  {displayName.charAt(0)}
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-[0.2em] text-white/35">
                     Signed in as
                   </p>
-                  <p className="text-white text-lg mt-1">{user.email}</p>
+                  <p className="text-white text-lg mt-1">{displayName}</p>
                 </div>
               </div>
 
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-white/35 mb-2">
-                  User ID
+                  Mobile Number
                 </p>
-                <p className="text-white/60 text-sm font-mono break-all bg-white/[0.03] px-4 py-3 rounded-xl border border-white/[0.06]">
-                  {user.uid}
+                <p className="text-white/80 text-lg bg-white/[0.03] px-4 py-3 rounded-xl border border-white/[0.06]">
+                  {displayPhone}
                 </p>
               </div>
 

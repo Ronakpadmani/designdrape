@@ -170,7 +170,7 @@ export default function AdminOrdersPage() {
       customers.forEach((c) => {
         map[c.uid] = {
           name: c.name,
-          email: c.email,
+          email: c.email || "",
           phoneNumber: c.phoneNumber || "",
         };
       });

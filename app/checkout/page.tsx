@@ -34,7 +34,7 @@ export default function CheckoutPage() {
       await placeOrder({
         userId: user.uid,
         customerName: userData?.name || user.displayName || "Customer",
-        customerEmail: userData?.email || user.email || "",
+        customerEmail: userData?.email || "",
         customerPhone: userData?.phoneNumber || "",
         items: cartItems,
         address,

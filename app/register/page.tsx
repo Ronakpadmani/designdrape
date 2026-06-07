@@ -3,26 +3,35 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { registerUser, logoutUser } from "@/services/authService";
+import { normalizePhone } from "@/lib/phoneAuth";
 import toast from "react-hot-toast";
 import AuthLayout from "@/components/AuthLayout";
+
 export default function RegisterPage() {
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
+  const [pin, setPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
   const router = useRouter();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (pin !== confirmPin) {
+      toast.error("PIN and Confirm PIN do not match");
+      return;
+    }
+
     try {
-      await registerUser(name, email, password);
+      await registerUser(name, phone, pin);
 
       await logoutUser();
 
       toast.success("Account created! Please sign in.");
 
+      const normalized = normalizePhone(phone) || phone;
       router.push(
-        `/login?redirect=${encodeURIComponent("/")}&registered=1&email=${encodeURIComponent(email)}`
+        `/login?redirect=${encodeURIComponent("/")}&registered=1&phone=${encodeURIComponent(normalized)}`
       );
     } catch (error: any) {
       toast.error(error.message);
@@ -32,7 +41,7 @@ export default function RegisterPage() {
   return (
     <AuthLayout
       title="Create account"
-      subtitle="Join DesignDrape for bespoke fashion experiences"
+      subtitle="Register with your mobile number and a 6-digit PIN"
       footerText="Already have an account?"
       footerLink="/login"
       footerLinkLabel="Sign in"
@@ -54,30 +63,52 @@ export default function RegisterPage() {
 
         <div>
           <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
-            Email
+            Mobile Number
           </label>
           <input
-            type="email"
-            placeholder="you@example.com"
+            type="tel"
+            inputMode="numeric"
+            placeholder="10-digit mobile number"
             className="input-field"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
             required
           />
         </div>
 
         <div>
           <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
-            Password
+            6-Digit PIN
           </label>
           <input
             type="password"
-            placeholder="••••••••"
+            inputMode="numeric"
+            placeholder="Create 6-digit PIN"
             className="input-field"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            maxLength={6}
+            pattern="\d{6}"
             required
-            minLength={6}
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs uppercase tracking-[0.2em] text-white/40 mb-2">
+            Confirm PIN
+          </label>
+          <input
+            type="password"
+            inputMode="numeric"
+            placeholder="Re-enter 6-digit PIN"
+            className="input-field"
+            value={confirmPin}
+            onChange={(e) =>
+              setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 6))
+            }
+            maxLength={6}
+            pattern="\d{6}"
+            required
           />
         </div>
 
