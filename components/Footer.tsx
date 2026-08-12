@@ -116,11 +116,11 @@ export default function Footer() {
 
             </div>
 
-            <div className="bg-white/10 p-4 rounded-full hover:bg-yellow-500 hover:text-black transition cursor-pointer">
+            {/* <div className="bg-white/10 p-4 rounded-full hover:bg-yellow-500 hover:text-black transition cursor-pointer">
 
               <FaLinkedinIn size={22} />
 
-            </div>
+            </div> */}
 
           </div>
 
